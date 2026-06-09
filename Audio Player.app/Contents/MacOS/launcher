@@ -1,0 +1,16 @@
+#!/bin/bash
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+RESOURCES="$DIR/../Resources"
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+# Create settings dir for logs
+LOG_DIR="$HOME/Library/Application Support/AudioPlayerHaribol"
+mkdir -p "$LOG_DIR"
+
+# Try to find python3
+PYTHON_EXE=$(which python3)
+if [ -z "$PYTHON_EXE" ]; then
+    osascript -e 'display dialog "Python 3 not found. Please install Python to run this app." buttons {"OK"} default button "OK"'
+    exit 1
+fi
+"$PYTHON_EXE" "$RESOURCES/app.py" > "$LOG_DIR/app.log" 2>&1

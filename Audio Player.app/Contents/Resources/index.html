@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Haribol Player</title>
+  <style>
+    :root {
+      --orange: #ff5500;
+      --orange-dark: #e64d00;
+      --bg: #f2f2f2;
+      --surface: #ffffff;
+      --text: #333333;
+      --text-light: #999999;
+      --border: #e5e5e5;
+      --active-bg: #fff6f1;
+      --player-bg: #f2f2f2;
+    }
+
+    * { box-sizing: border-box; }
+    button { cursor: pointer; border: none; background: none; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .container {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      flex: 1;
+      height: calc(100vh - 80px);
+      overflow: hidden;
+    }
+
+    .sidebar {
+      background: #f7f7f7;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 20px 0;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 0 20px 10px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #bbbbbb;
+      font-weight: 700;
+    }
+
+    .folder-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .folder-item {
+      padding: 9px 20px;
+      cursor: pointer;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #666666;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background 0.12s, color 0.12s;
+    }
+
+    .folder-icon { flex-shrink: 0; color: #1a1a1a; transition: color 0.12s; }
+    .folder-item-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .folder-item.active { background: #fcfcfc; color: var(--orange); font-weight: 600; }
+    .folder-item.active .folder-icon { color: #b84300; }
+    .folder-item:hover:not(.active) { background: #fcfcfc; }
+
+    .main-content {
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .main-header {
+      padding: 30px 40px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+    }
+
+    .main-header h1 { margin: 0; font-size: 26px; font-weight: 500; }
+    .header-actions { display: flex; align-items: center; gap: 16px; }
+
+    .search-container { position: relative; display: flex; align-items: center; }
+    .search-icon { position: absolute; left: 10px; width: 14px; height: 14px; color: #999999; pointer-events: none; }
+    .search-input {
+      background: var(--bg);
+      border: 1px solid transparent;
+      border-radius: 16px;
+      padding: 6px 28px 6px 30px;
+      font-size: 13px;
+      width: 140px;
+      outline: none;
+      color: var(--text);
+      transition: all 0.2s ease;
+    }
+    .search-input:focus { border-color: var(--orange); background: var(--surface); box-shadow: 0 0 0 2px rgba(255, 85, 0, 0.15); width: 190px; }
+    
+    .playlist { flex: 1; overflow-y: auto; padding: 10px 0 100px; }
+    .track-item {
+      display: grid;
+      grid-template-columns: 50px 1fr 74px;
+      align-items: center;
+      padding: 10px 40px;
+      border-bottom: 1px solid #f2f2f2;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text);
+      transition: background 0.1s, color 0.1s;
+    }
+    .track-item:hover { background: #fcfcfc; }
+    .track-item.active { background: var(--active-bg); }
+    .track-item.active .track-name, .track-item.active .track-index { color: var(--orange); font-weight: 500; }
+    .track-index { color: #cccccc; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .track-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 20px; }
+    
+    .track-duration-wrapper { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+    .track-duration { text-align: right; color: #999999; font-size: 11px; font-variant-numeric: tabular-nums; font-family: "SF Mono", monospace; }
+
+    .show-folder-btn { opacity: 0; padding: 4px; cursor: pointer; color: #999999; display: flex; align-items: center; justify-content: center; transition: opacity 0.3s ease; }
+    .track-item:hover .show-folder-btn { opacity: 1; }
+    .show-folder-btn:hover { color: var(--orange); }
+    .show-folder-btn svg { width: 16px; height: 16px; pointer-events: none; }
+
+    .player-bar {
+      height: 80px;
+      background: linear-gradient(to bottom, #ffffff 0%, #ededed 100%);
+      border-top: 1px solid var(--border);
+      position: fixed;
+      inset: auto 0 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 40px 0 20px;
+    }
+
+    .controls-area { width: 250px; display: flex; align-items: center; justify-content: flex-start; gap: 12px; }
+    .control-btn { padding: 8px; color: var(--text); display: flex; align-items: center; justify-content: center; }
+    .control-btn:hover { color: var(--orange); }
+    .control-btn.active { color: var(--orange); }
+    .control-btn svg { width: 20px; height: 20px; fill: currentColor; }
+    #prevButton svg, #nextButton svg { width: 26px; height: 26px; }
+    .play-btn { background: #333333; border-radius: 50%; width: 44px; height: 44px; color: white; padding: 0; }
+    .play-btn:hover { background: #000000; }
+    .play-btn svg { width: 22px; height: 22px; }
+
+    .progress-container { flex: 1; display: flex; align-items: center; justify-content: center; gap: 16px; }
+    .time-group { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-light); font-family: "SF Mono", monospace; min-width: 48px; }
+    .progress-bar-wrapper { flex: 1; position: relative; height: 4px; background: #dddddd; cursor: pointer; border-radius: 2px; }
+    .progress-fill { position: absolute; top: 0; left: 0; height: 100%; background: var(--orange); pointer-events: none; }
+
+    .track-info-area { width: 400px; display: flex; align-items: center; justify-content: flex-end; overflow: hidden; text-align: right; }
+    #trackTitleDisplay { font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+
+    .hidden { display: none; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: #cccccc; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <aside class="sidebar">
+      <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; padding-right: 20px;">
+        <span>Folders</span>
+        <button id="changeFolderBtn" style="color: #999; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 4px;" title="Change Library Folder">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+        </button>
+      </div>
+      <ul class="folder-list" id="folderList"></ul>
+    </aside>
+    <main class="main-content">
+      <header class="main-header">
+        <h1 id="headerTitle">Library</h1>
+        <div class="header-actions">
+          <div class="search-container">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="searchInput" placeholder="Search..." class="search-input" autocomplete="off">
+          </div>
+        </div>
+      </header>
+      <div class="playlist" id="playlist">
+        <div style="text-align: center; margin-top: 100px; color: #999;">Loading...</div>
+      </div>
+    </main>
+  </div>
+
+  <footer class="player-bar">
+    <div class="controls-area">
+      <button id="prevButton" class="control-btn"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6L18 18V6z"/></svg></button>
+      <button id="playButton" class="control-btn play-btn"><svg id="playIconSVG" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+      <button id="nextButton" class="control-btn"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+      <button id="shuffleButton" class="control-btn" title="Shuffle">
+        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M13.177173333333334 1.22288c-0.20832 -0.20828373333333333 -0.5460266666666667 -0.20828373333333333 -0.7543466666666667 0 -0.20821333333333333 0.20827733333333331 -0.20821333333333333 0.5459626666666666 0 0.7542399999999999L13.64576 3.2H12.8c-1.38272 0 -2.4414826666666665 0.6231786666666667 -3.3360213333333335 1.4819306666666667 -0.7166186666666667 0.6879573333333333 -1.3642560000000001 1.5653653333333333 -2.003061333333333 2.430816 -0.14052266666666666 0.19037866666666667 -0.280608 0.38018133333333337 -0.42091733333333337 0.5672533333333334C5.449322666666666 9.800906666666666 3.7230613333333333 11.733333333333333 0.5333333333333333 11.733333333333333c-0.29455146666666665 0 -0.5333333333333333 0.23882666666666666 -0.5333333333333333 0.5333333333333333s0.23878186666666668 0.5333333333333333 0.5333333333333333 0.5333333333333333c3.7436053333333335 0 5.750677333333333 -2.33424 7.36 -4.48 0.153248 -0.20432 0.30208 -0.40573866666666664 0.4479573333333333 -0.6031573333333333l0.000096 -0.00011733333333333333 0.00001066666666666667 -0.00002133333333333333c0.6364586666666666 -0.8612906666666666 1.216672 -1.646464 1.8612906666666666 -2.2653013333333334C10.974826666666667 4.710154666666667 11.782720000000001 4.266666666666667 12.8 4.266666666666667h0.8457600000000001l-1.2229333333333334 1.22288c-0.20821333333333333 0.20827733333333331 -0.20821333333333333 0.5459626666666666 0 0.7542399999999999 0.20832 0.208288 0.5460266666666667 0.208288 0.7543466666666667 0l2.1333333333333333 -2.1333333333333333c0.20821333333333333 -0.20827733333333331 0.20821333333333333 -0.5459626666666666 0 -0.7542399999999999l-2.1333333333333333 -2.1333333333333333ZM0.5333333333333333 3.2c3.0429653333333335 0 4.9385813333333335 1.542272 6.405845333333334 3.2719573333333334l-0.13789866666666667 0.18688C6.664853333333333 6.84384 6.531125333333334 7.025162666666667 6.4 7.2c-0.038432 0.051242666666666666 -0.07682133333333334 0.10219733333333333 -0.1152 0.152864C4.878378666666666 5.645930666666667 3.228128 4.266666666666667 0.5333333333333333 4.266666666666667 0.23878186666666668 4.266666666666667 0 4.027882666666667 0 3.7333333333333334S0.23878186666666668 3.2 0.5333333333333333 3.2Zm8.930645333333333 8.118079999999999c-0.5329493333333333 -0.51168 -1.027744 -1.128064 -1.5091306666666666 -1.7664213333333334 0.20182399999999998 -0.2536 0.39399466666666666 -0.5056746666666666 0.5784853333333333 -0.7516586666666666l0.09586133333333334 -0.12813866666666668c0.5272 0.7084266666666666 1.0272106666666667 1.3523093333333334 1.5734933333333332 1.876736C10.974826666666667 11.289813333333333 11.782720000000001 11.733333333333333 12.8 11.733333333333333h0.8457600000000001l-1.2229333333333334 -1.22288c-0.20821333333333333 -0.20827733333333331 -0.20821333333333333 -0.5459626666666666 0 -0.7542399999999999 0.20832 -0.208288 0.5460266666666667 -0.208288 0.7543466666666667 0l2.1333333333333333 2.13328c0.20821333333333333 0.20832 0.20821333333333333 0.5460266666666667 0 0.7543466666666667l-2.1333333333333333 2.1333333333333333c-0.20832 0.20821333333333333 -0.5460266666666667 0.20821333333333333 -0.7543466666666667 0 -0.20821333333333333 -0.20832 -0.20821333333333333 -0.5460266666666667 0 -0.7543466666666667L13.64576 12.8H12.8c-1.38272 0 -2.4414826666666665 -0.6231466666666667 -3.3360213333333335 -1.48192Z" fill="currentColor" stroke-width="1.0667"></path>
+        </svg>
+      </button>
+    </div>
+    <div class="progress-container">
+      <div class="time-group left"><span id="currentTime">0:00</span></div>
+      <div class="progress-bar-wrapper" id="progressWrapper">
+        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+      </div>
+      <div class="time-group right"><span id="duration">0:00</span></div>
+    </div>
+    <div class="track-info-area">
+      <div id="trackTitleDisplay">No track selected</div>
+    </div>
+    <audio id="audio" class="hidden"></audio>
+  </footer>
+
+  <script>
+    const audio = document.getElementById('audio');
+    const playlist = document.getElementById('playlist');
+    const playButton = document.getElementById('playButton');
+    const playIconSVG = document.getElementById('playIconSVG');
+    const prevButton = document.getElementById('prevButton');
+    const nextButton = document.getElementById('nextButton');
+    const shuffleButton = document.getElementById('shuffleButton');
+    const currentTimeText = document.getElementById('currentTime');
+    const durationText = document.getElementById('duration');
+    const progressFill = document.getElementById('progressFill');
+    const trackTitleDisplay = document.getElementById('trackTitleDisplay');
+    const folderList = document.getElementById('folderList');
+    const searchInput = document.getElementById('searchInput');
+    const progressWrapper = document.getElementById('progressWrapper');
+
+    const PLAY_ICON = '<path d="M8 5v14l11-7z"/>';
+    const PAUSE_ICON = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+
+    const state = {
+      tracks: [],
+      filteredTracks: [],
+      folders: [],
+      collapsedFolders: new Set(),
+      activeFolder: null,
+      currentTrack: null,
+      index: -1,
+      isShuffle: false,
+      searchQuery: '',
+      durations: {} // Store fetched durations here
+    };
+
+    function formatTime(secs) {
+      if (!secs || isNaN(secs)) return '0:00';
+      const m = Math.floor(secs / 60);
+      const s = Math.floor(secs % 60);
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    function stripPrefix(name) {
+      if (!name || name === '.') return 'Library';
+      return name.startsWith('!') ? name.substring(1).trim() : name;
+    }
+
+    function updateFilteredTracks() {
+      let tracks = state.tracks;
+      if (state.activeFolder !== null) {
+        if (state.activeFolder === '') {
+          // Root shows all tracks
+          state.filteredTracks = tracks;
+        } else {
+          // Recursive filtering: match current folder or any subfolder
+          tracks = tracks.filter(t => t.folder === state.activeFolder || t.folder.startsWith(state.activeFolder + '/'));
+        }
+      }
+      if (state.searchQuery) {
+        const query = state.searchQuery.toLowerCase();
+        tracks = tracks.filter(t => t.name.toLowerCase().includes(query));
+      }
+      state.filteredTracks = tracks;
+      state.index = state.currentTrack ? state.filteredTracks.findIndex(t => t.path === state.currentTrack.path) : -1;
+      renderPlaylist();
+    }
+
+    function sortFolders(a, b) {
+      if (a === b) return 0;
+      if (a === '') return -1;
+      if (b === '') return 1;
+
+      const aParts = a.split('/');
+      const bParts = b.split('/');
+
+      let i = 0;
+      while (i < aParts.length && i < bParts.length && aParts[i] === bParts[i]) {
+        i++;
+      }
+
+      if (i === aParts.length && i < bParts.length) return -1;
+      if (i === bParts.length && i < aParts.length) return 1;
+
+      const aSeg = aParts[i];
+      const bSeg = bParts[i];
+
+      const aNum = parseInt(aSeg, 10);
+      const bNum = parseInt(bSeg, 10);
+      const aIsNum = !isNaN(aNum) && String(aNum) === aSeg;
+      const bIsNum = !isNaN(bNum) && String(bNum) === bSeg;
+
+      if (aIsNum && bIsNum) return aNum - bNum;
+      if (aIsNum) return -1;
+      if (bIsNum) return 1;
+      return aSeg.localeCompare(bSeg);
+    }
+
+    function renderSidebar() {
+      if (state.folders.length === 0) {
+        folderList.innerHTML = '<li style="padding: 20px; color: #999;">No folders</li>';
+        return;
+      }
+
+      // Check if a folder has any children in the hierarchy
+      const hasChildren = (folder) => {
+        return state.folders.some(f => f !== folder && f.startsWith(folder + (folder ? '/' : '')));
+      };
+
+      const visibleFolders = [];
+      state.folders.forEach(folder => {
+        if (folder === '') {
+          visibleFolders.push(folder);
+          return;
+        }
+        // A folder is visible if none of its parent folders are collapsed
+        const parts = folder.split('/');
+        let parentPath = '';
+        let shouldShow = true;
+        for (let i = 0; i < parts.length - 1; i++) {
+          parentPath = parentPath ? parentPath + '/' + parts[i] : parts[i];
+          if (state.collapsedFolders.has(parentPath)) {
+            shouldShow = false;
+            break;
+          }
+        }
+        if (shouldShow) {
+          visibleFolders.push(folder);
+        }
+      });
+
+      folderList.innerHTML = visibleFolders.map(folder => {
+        const parts = folder.split('/').filter(Boolean);
+        const name = folder === '' || folder === '.' ? 'Library' : stripPrefix(parts[parts.length - 1]);
+        const isActive = state.activeFolder === folder;
+        const depth = folder === '' ? 0 : parts.length;
+        const isCollapsed = state.collapsedFolders.has(folder);
+        const canCollapse = hasChildren(folder);
+
+        let toggleBtn = '';
+        if (canCollapse) {
+          const arrowDir = isCollapsed ? '▶' : '▼';
+          toggleBtn = `<span class="folder-toggle" onclick="toggleFolder(event, '${folder.replace(/'/g, "\\'")}')" style="margin-right: 4px; cursor: pointer; user-select: none; font-size: 9px; width: 10px; display: inline-block; color: #888;">${arrowDir}</span>`;
+        } else {
+          toggleBtn = `<span style="margin-right: 4px; width: 10px; display: inline-block;"></span>`;
+        }
+
+        return `
+          <li class="folder-item ${isActive ? 'active' : ''}" style="padding-left: ${15 + depth * 12}px" onclick="filterByFolder('${folder.replace(/'/g, "\\'")}')">
+            ${toggleBtn}
+            <svg class="folder-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="margin-right: 6px;"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>
+            <span class="folder-item-text" style="font-size: 13px;">${name}</span>
+          </li>
+        `;
+      }).join('');
+    }
+
+    window.toggleFolder = function(event, path) {
+      event.stopPropagation();
+      if (state.collapsedFolders.has(path)) {
+        state.collapsedFolders.delete(path);
+      } else {
+        state.collapsedFolders.add(path);
+      }
+      window.pywebview.api.save_collapsed_folders([...state.collapsedFolders]);
+      renderSidebar();
+    };
+
+    const durationObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const el = entry.target;
+          const url = el.dataset.url;
+          const path = el.dataset.path;
+          
+          if (state.durations[path]) {
+            el.textContent = formatTime(state.durations[path]);
+            durationObserver.unobserve(el);
+            return;
+          }
+
+          // Create a more robust temporary audio element
+          const tempAudio = new Audio();
+          
+          // Prevent garbage collection while loading
+          if (!window._tempAudios) window._tempAudios = new Set();
+          window._tempAudios.add(tempAudio);
+
+          tempAudio.preload = 'metadata';
+          tempAudio.src = url;
+
+          const cleanup = () => {
+            tempAudio.onloadedmetadata = null;
+            tempAudio.onerror = null;
+            tempAudio.src = '';
+            window._tempAudios.delete(tempAudio);
+          };
+
+          tempAudio.onloadedmetadata = () => {
+            state.durations[path] = tempAudio.duration;
+            el.textContent = formatTime(tempAudio.duration);
+            cleanup();
+          };
+
+          tempAudio.onerror = (e) => {
+            console.error("Browser metadata error for:", url, e);
+            el.textContent = '--:--';
+            cleanup();
+          };
+          
+          durationObserver.unobserve(el);
+        }
+      });
+    }, { root: playlist, rootMargin: '0px 0px 400px 0px' });
+
+    function renderPlaylist() {
+      if (state.filteredTracks.length === 0) {
+        playlist.innerHTML = '<div style="text-align: center; margin-top: 80px; color: #999;">Empty</div>';
+        return;
+      }
+      playlist.innerHTML = state.filteredTracks.map((track, i) => {
+        const isActive = state.currentTrack && state.currentTrack.path === track.path;
+        const savedDuration = state.durations[track.path];
+        return `
+          <div class="track-item ${isActive ? 'active' : ''}" onclick="playTrack(${i})">
+            <div class="track-index">${i + 1}</div>
+            <div class="track-name">${track.name}</div>
+            <div class="track-duration-wrapper">
+              <button class="show-folder-btn" onclick="showInFinder(event, ${i})">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+              </button>
+              <div class="track-duration" data-url="${track.url}" data-path="${track.path}">${savedDuration ? formatTime(savedDuration) : '--:--'}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      playlist.querySelectorAll('.track-duration').forEach(el => {
+        if (el.textContent === '--:--') {
+          durationObserver.observe(el);
+        }
+      });
+    }
+
+    window.filterByFolder = function(path) {
+      state.activeFolder = path;
+      updateFilteredTracks();
+      renderSidebar();
+    };
+
+    window.showInFinder = function(event, idx) {
+      event.preventDefault(); event.stopPropagation();
+      window.pywebview.api.show_in_finder(state.filteredTracks[idx].path);
+    };
+
+    window.playTrack = function(idx, startTime = 0) {
+      const track = state.filteredTracks[idx];
+      if (!track) return;
+      
+      if (state.currentTrack && state.currentTrack.path === track.path && startTime === 0) {
+        audio.paused ? audio.play() : audio.pause();
+        return;
+      }
+
+      state.currentTrack = track;
+      state.index = idx;
+      audio.src = track.url;
+      audio.currentTime = startTime;
+      audio.play().catch(e => console.error("Play failed", e));
+
+      trackTitleDisplay.textContent = track.name;
+      renderPlaylist();
+    };
+
+    function nextTrack() {
+      if (state.filteredTracks.length === 0) return;
+      let nextIdx = state.isShuffle ? Math.floor(Math.random() * state.filteredTracks.length) : (state.index + 1) % state.filteredTracks.length;
+      playTrack(nextIdx);
+    }
+
+    function prevTrack() {
+      if (state.filteredTracks.length === 0) return;
+      let prevIdx = state.isShuffle ? Math.floor(Math.random() * state.filteredTracks.length) : (state.index - 1 + state.filteredTracks.length) % state.filteredTracks.length;
+      playTrack(prevIdx);
+    }
+
+    async function initApp() {
+      try {
+        console.log("pywebview is ready");
+        state.tracks = await window.pywebview.api.get_tracks();
+        
+        // Generate hierarchy of folder paths including intermediate empty folders
+        const foldersSet = new Set();
+        state.tracks.forEach(track => {
+          let f = track.folder;
+          foldersSet.add(f);
+          while (f.includes('/')) {
+            f = f.substring(0, f.lastIndexOf('/'));
+            foldersSet.add(f);
+          }
+          if (f !== '') {
+            foldersSet.add('');
+          }
+        });
+        state.folders = [...foldersSet].sort(sortFolders);
+        
+        const storedCollapsed = await window.pywebview.api.load_collapsed_folders();
+        state.collapsedFolders = new Set(Array.isArray(storedCollapsed) ? storedCollapsed : []);
+        
+        const lastPos = await window.pywebview.api.load_position();
+        if (lastPos && lastPos.track_path) {
+          const idx = state.tracks.findIndex(t => t.path === lastPos.track_path);
+          if (idx !== -1) {
+            state.activeFolder = state.tracks[idx].folder;
+            updateFilteredTracks();
+            const fIdx = state.filteredTracks.findIndex(t => t.path === lastPos.track_path);
+            if (fIdx !== -1) playTrack(fIdx, lastPos.time || 0);
+          }
+        }
+
+        if (state.activeFolder === null && state.folders.length > 0) {
+          // Default to root folder if it exists, otherwise the first folder
+          state.activeFolder = state.folders.includes('') ? '' : state.folders[0];
+          updateFilteredTracks();
+        }
+        renderSidebar();
+
+        setInterval(() => {
+          if (state.currentTrack && !audio.paused) {
+            window.pywebview.api.save_position({
+              track_path: state.currentTrack.path,
+              time: audio.currentTime
+            });
+          }
+        }, 5000);
+      } catch (err) {
+        console.error("Initialization error", err);
+        playlist.innerHTML = `<div style="text-align: center; margin-top: 100px; color: red;">Initialization Error: ${err.message}<br><br><small>Check console logs for details</small></div>`;
+      }
+    }
+
+    if (window.pywebview && window.pywebview.api) {
+      initApp();
+    } else {
+      window.addEventListener('pywebviewready', initApp);
+    }
+
+    searchInput.addEventListener('input', (e) => {
+      state.searchQuery = e.target.value;
+      updateFilteredTracks();
+    });
+
+    playButton.addEventListener('click', () => {
+      if (!audio.src && state.filteredTracks.length > 0) playTrack(0);
+      else audio.paused ? audio.play() : audio.pause();
+    });
+
+    prevButton.addEventListener('click', prevTrack);
+    nextButton.addEventListener('click', nextTrack);
+    shuffleButton.addEventListener('click', () => {
+      state.isShuffle = !state.isShuffle;
+      shuffleButton.classList.toggle('active', state.isShuffle);
+    });
+
+    audio.onplay = () => playIconSVG.innerHTML = PAUSE_ICON;
+    audio.onpause = () => playIconSVG.innerHTML = PLAY_ICON;
+    audio.onended = nextTrack;
+    audio.ontimeupdate = () => {
+      if (!audio.duration) return;
+      progressFill.style.width = `${audio.currentTime / audio.duration * 100}%`;
+      currentTimeText.textContent = formatTime(audio.currentTime);
+    };
+    audio.onloadedmetadata = () => durationText.textContent = formatTime(audio.duration);
+
+    progressWrapper.addEventListener('click', (e) => {
+      if (!audio.duration) return;
+      const rect = progressWrapper.getBoundingClientRect();
+      const percent = (e.clientX - rect.left) / rect.width;
+      audio.currentTime = percent * audio.duration;
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') { e.preventDefault(); playButton.click(); }
+      if (e.code === 'ArrowRight') audio.currentTime += 10;
+      if (e.code === 'ArrowLeft') audio.currentTime -= 10;
+    });
+
+    const changeFolderBtn = document.getElementById('changeFolderBtn');
+    changeFolderBtn.addEventListener('click', async () => {
+      if (window.pywebview && window.pywebview.api) {
+        const success = await window.pywebview.api.change_library_dir();
+        if (success) {
+          window.location.reload();
+        }
+      }
+    });
+  </script>
+</body>
+</html>
